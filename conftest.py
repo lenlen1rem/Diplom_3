@@ -1,0 +1,46 @@
+import pytest
+import requests
+from selenium import webdriver
+from faker import Faker
+from url import Url
+from pages.base_page import BasePage
+from locators.base_locators import BaseLocators
+
+
+def pytest_addoption(parser):
+    parser.addoption("--browser", default="chrome")
+
+
+@pytest.fixture
+def browser(request):
+    browser_name = request.config.getoption("--browser")
+    if browser_name == "chrome":
+        driver = webdriver.Chrome()
+    elif browser_name == "firefox":
+        driver = webdriver.Firefox()
+    else:
+        raise ValueError(f"Браузер {browser_name} не поддерживается")
+    driver.maximize_window()
+    yield driver
+    driver.quit()
+
+
+@pytest.fixture
+def created_user():
+    fake = Faker(locale='ru_RU')
+    user_data = {
+        "email": fake.email(),
+        "password": fake.password(),
+        "name": fake.first_name()
+    }
+    requests.post(Url.create_user, json=user_data)
+    return user_data
+
+
+@pytest.fixture
+def logged_in_browser(browser, created_user):
+    browser.get(Url.url_page)
+    base_page = BasePage(browser)
+    base_page.login(created_user["email"], created_user["password"])
+    base_page.wait_for_element_visible(BaseLocators.BUN)
+    return browser
